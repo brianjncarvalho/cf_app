@@ -3,6 +3,16 @@
   publish = "dist"
   functions = "netlify/functions"
 
+[[redirects]]
+  from = "/api/coach"
+  to = "/.netlify/functions/coach"
+  status = 200
+
+[[redirects]]
+  from = "/api/data"
+  to = "/.netlify/functions/data"
+  status = 200
+
 [[headers]]
   for = "/api/*"
   [headers.values]

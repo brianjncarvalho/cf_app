@@ -1,44 +1,37 @@
-import { getStore } from "@netlify/blobs";
+const { getStore } = require("@netlify/blobs");
 
-const CORS = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "Content-Type",
-  "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
-  "Content-Type": "application/json",
-};
+exports.handler = async (event) => {
+  const CORS = {
+    "Access-Control-Allow-Origin": "*",
+    "Access-Control-Allow-Headers": "Content-Type",
+    "Content-Type": "application/json",
+  };
 
-export default async (req, context) => {
-  // Handle CORS preflight
-  if (req.method === "OPTIONS") {
-    return new Response(null, { status: 204, headers: CORS });
+  if (event.httpMethod === "OPTIONS") {
+    return { statusCode: 204, headers: CORS, body: "" };
   }
 
   const store = getStore("crossfit-tracker");
-  const url = new URL(req.url);
-  const key = url.searchParams.get("key") || "default";
+  const key = event.queryStringParameters?.key || "default";
 
-  // GET — load data
-  if (req.method === "GET") {
+  if (event.httpMethod === "GET") {
     try {
       const value = await store.get(key, { type: "json" });
-      return new Response(JSON.stringify({ data: value || null }), { status: 200, headers: CORS });
+      return { statusCode: 200, headers: CORS, body: JSON.stringify({ data: value || null }) };
     } catch (err) {
-      return new Response(JSON.stringify({ data: null, error: err.message }), { status: 200, headers: CORS });
+      return { statusCode: 200, headers: CORS, body: JSON.stringify({ data: null, error: err.message }) };
     }
   }
 
-  // POST — save data
-  if (req.method === "POST") {
+  if (event.httpMethod === "POST") {
     try {
-      const body = await req.json();
-      await store.setJSON(key, body.data);
-      return new Response(JSON.stringify({ ok: true }), { status: 200, headers: CORS });
+      const { data } = JSON.parse(event.body);
+      await store.setJSON(key, data);
+      return { statusCode: 200, headers: CORS, body: JSON.stringify({ ok: true }) };
     } catch (err) {
-      return new Response(JSON.stringify({ ok: false, error: err.message }), { status: 500, headers: CORS });
+      return { statusCode: 500, headers: CORS, body: JSON.stringify({ ok: false, error: err.message }) };
     }
   }
 
-  return new Response("Method not allowed", { status: 405, headers: CORS });
+  return { statusCode: 405, headers: CORS, body: "Method not allowed" };
 };
-
-export const config = { path: "/api/data" };
