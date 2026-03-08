@@ -212,7 +212,6 @@ export default function App() {
   const [logs, setLogs] = useState({});
   const [chats, setChats] = useState([]);
   const [aiLoading, setAiLoading] = useState(false);
-  const [aiInput, setAiInput] = useState("");
   const [logModal, setLogModal] = useState(null);
   const [logForm, setLogForm] = useState({ completed: true, time: "", weight: "", notes: "", rpe: 7 });
 
@@ -272,10 +271,9 @@ export default function App() {
     setLogForm({ completed: true, time: "", weight: "", notes: "", rpe: 7 });
   };
 
-  const sendAiMessage = async (customMsg) => {
-    const msg = customMsg || aiInput.trim();
-    if (!msg) return;
-    setAiInput("");
+  const sendAiMessage = async (msg) => {
+    if (!msg || !msg.trim()) return;
+    msg = msg.trim();
     setAiLoading(true);
     const recentLogs = Object.entries(logs).slice(-10).map(([k, v]) => {
       const [, w, d] = k.match(/w(\d+)_d(\d+)/) || [];
@@ -521,7 +519,15 @@ export default function App() {
   );
 
   const AIView = () => {
+    // useRef for input = uncontrolled = no re-render on keystroke = keyboard stays up
+    const inputRef = useRef(null);
     const suggestions = ["Analyze my recent performance and suggest adjustments","I'm feeling tired — should I deload?","What weight should I aim for on today's back squat?","How am I progressing overall?"];
+    const submit = () => {
+      const val = inputRef.current?.value || "";
+      if (!val.trim() || aiLoading) return;
+      inputRef.current.value = "";
+      sendAiMessage(val);
+    };
     return (
       <div style={{display:"flex",flexDirection:"column",height:"100vh",paddingBottom:100}}>
         <div style={{background:"linear-gradient(135deg,#0f0f0f,#1a0e2e)",padding:"50px 20px 16px",borderBottom:"1px solid #222",flexShrink:0}}>
@@ -553,9 +559,9 @@ export default function App() {
         </div>
         <div style={{padding:"12px 16px 16px",borderTop:"1px solid #1f2937",background:"#0a0a0a",flexShrink:0}}>
           <div style={{display:"flex",gap:10}}>
-            <input value={aiInput} onChange={e=>setAiInput(e.target.value)} onKeyDown={e=>e.key==="Enter"&&!e.shiftKey&&sendAiMessage()}
+            <input ref={inputRef} onKeyDown={e=>e.key==="Enter"&&!e.shiftKey&&submit()}
               placeholder="Ask your coach..." style={{flex:1,background:"#111",border:"1px solid #374151",borderRadius:14,padding:"12px 16px",color:"#fff",fontSize:14,outline:"none"}}/>
-            <button onClick={()=>sendAiMessage()} style={{background:aiInput.trim()&&!aiLoading?"#7c3aed":"#1f2937",color:"#fff",border:"none",borderRadius:14,padding:"12px 16px",cursor:aiInput.trim()&&!aiLoading?"pointer":"default",display:"flex",alignItems:"center"}}>
+            <button onClick={submit} style={{background:"#7c3aed",color:"#fff",border:"none",borderRadius:14,padding:"12px 16px",cursor:"pointer",display:"flex",alignItems:"center",opacity:aiLoading?0.5:1}}>
               <Icon name="send" size={18}/>
             </button>
           </div>
@@ -628,12 +634,12 @@ export default function App() {
           {logForm.completed && <>
             <div style={{marginBottom:14}}>
               <label style={{color:"#9ca3af",fontSize:12,display:"block",marginBottom:6}}>TIME (e.g. "12:34")</label>
-              <input value={logForm.time} onChange={e=>setLogForm(f=>({...f,time:e.target.value}))} placeholder="12:34"
+              <input defaultValue={logForm.time} onBlur={e=>setLogForm(f=>({...f,time:e.target.value}))} placeholder="12:34"
                 style={{width:"100%",background:"#111",border:"1px solid #374151",borderRadius:12,padding:"12px 14px",color:"#fff",fontSize:15,outline:"none",boxSizing:"border-box"}}/>
             </div>
             <div style={{marginBottom:14}}>
               <label style={{color:"#9ca3af",fontSize:12,display:"block",marginBottom:6}}>WEIGHT USED</label>
-              <input value={logForm.weight} onChange={e=>setLogForm(f=>({...f,weight:e.target.value}))} placeholder="135 lbs"
+              <input defaultValue={logForm.weight} onBlur={e=>setLogForm(f=>({...f,weight:e.target.value}))} placeholder="135 lbs"
                 style={{width:"100%",background:"#111",border:"1px solid #374151",borderRadius:12,padding:"12px 14px",color:"#fff",fontSize:15,outline:"none",boxSizing:"border-box"}}/>
             </div>
             <div style={{marginBottom:14}}>
@@ -650,7 +656,7 @@ export default function App() {
           </>}
           <div style={{marginBottom:20}}>
             <label style={{color:"#9ca3af",fontSize:12,display:"block",marginBottom:6}}>NOTES (optional)</label>
-            <textarea value={logForm.notes} onChange={e=>setLogForm(f=>({...f,notes:e.target.value}))} placeholder="How did it feel? Any PRs?" rows={3}
+            <textarea defaultValue={logForm.notes} onBlur={e=>setLogForm(f=>({...f,notes:e.target.value}))} placeholder="How did it feel? Any PRs?" rows={3}
               style={{width:"100%",background:"#111",border:"1px solid #374151",borderRadius:12,padding:"12px 14px",color:"#fff",fontSize:14,outline:"none",resize:"none",boxSizing:"border-box"}}/>
           </div>
           <div style={{display:"flex",gap:10}}>
