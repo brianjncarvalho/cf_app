@@ -157,9 +157,27 @@ const WEEKS_DATA = [
 // ============================================================
 // HELPERS
 // ============================================================
+// Cloud storage via Netlify Blobs (with localStorage as fast cache)
 const lsGet = (k) => { try { return localStorage.getItem(k); } catch { return null; } };
 const lsSet = (k, v) => { try { localStorage.setItem(k, v); } catch {} };
-const KEYS = { logs: "cf_logs_v3", chats: "cf_chats_v3" };
+
+const cloudLoad = async (key) => {
+  try {
+    const res = await fetch(`/api/data?key=${key}`);
+    const json = await res.json();
+    return json.data;
+  } catch { return null; }
+};
+
+const cloudSave = async (key, data) => {
+  try {
+    await fetch(`/api/data?key=${key}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ data }),
+    });
+  } catch {}
+};
 const getPhaseForWeek = (w) => PHASES.find(p => p.weeks.includes(w)) || PHASES[0];
 const getDayName = (d) => ["Mon","Tue","Wed","Thu","Fri"][d-1] || `Day ${d}`;
 const logKey = (w, d) => `w${w}_d${d}`;
@@ -198,15 +216,42 @@ export default function App() {
   const [logModal, setLogModal] = useState(null);
   const [logForm, setLogForm] = useState({ completed: true, time: "", weight: "", notes: "", rpe: 7 });
 
+  const [syncing, setSyncing] = useState(true);
+
   useEffect(() => {
-    try {
-      const l = lsGet(KEYS.logs); if (l) setLogs(JSON.parse(l));
-      const c = lsGet(KEYS.chats); if (c) setChats(JSON.parse(c));
-    } catch {}
+    const init = async () => {
+      // Load from localStorage instantly so UI is not blank
+      try {
+        const ll = lsGet("cf_logs"); if (ll) setLogs(JSON.parse(ll));
+        const lc = lsGet("cf_chats"); if (lc) setChats(JSON.parse(lc));
+      } catch {}
+
+      // Then load from cloud (authoritative source) and update
+      try {
+        const [cloudLogs, cloudChats] = await Promise.all([
+          cloudLoad("logs"),
+          cloudLoad("chats"),
+        ]);
+        if (cloudLogs) { setLogs(cloudLogs); lsSet("cf_logs", JSON.stringify(cloudLogs)); }
+        if (cloudChats) { setChats(cloudChats); lsSet("cf_chats", JSON.stringify(cloudChats)); }
+      } catch {}
+
+      setSyncing(false);
+    };
+    init();
   }, []);
 
-  const saveLogs = (nl) => { setLogs(nl); lsSet(KEYS.logs, JSON.stringify(nl)); };
-  const saveChats = (nc) => { setChats(nc); lsSet(KEYS.chats, JSON.stringify(nc)); };
+  const saveLogs = (nl) => {
+    setLogs(nl);
+    lsSet("cf_logs", JSON.stringify(nl));
+    cloudSave("logs", nl);
+  };
+
+  const saveChats = (nc) => {
+    setChats(nc);
+    lsSet("cf_chats", JSON.stringify(nc));
+    cloudSave("chats", nc);
+  };
 
   const getLog = (w, d) => logs[logKey(w, d)];
   const totalWorkouts = WEEKS_DATA.reduce((s, w) => s + w.days.length, 0);
@@ -274,7 +319,11 @@ export default function App() {
           <div style={{marginTop:20,background:"rgba(255,255,255,.1)",borderRadius:8,height:8,overflow:"hidden"}}>
             <div style={{width:`${(completedWorkouts/totalWorkouts)*100}%`,height:"100%",background:`linear-gradient(90deg,${getPhaseForWeek(currentWeek).color},#f59e0b)`,borderRadius:8,transition:"width .5s"}}/>
           </div>
-          <p style={{color:"#9ca3af",fontSize:12,margin:"6px 0 0"}}>{completedWorkouts}/{totalWorkouts} workouts complete · {Math.round((completedWorkouts/totalWorkouts)*100)}%</p>
+          <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginTop:6}}>
+            <p style={{color:"#9ca3af",fontSize:12,margin:0}}>{completedWorkouts}/{totalWorkouts} workouts complete · {Math.round((completedWorkouts/totalWorkouts)*100)}%</p>
+            {syncing && <p style={{color:"#4b5563",fontSize:11,margin:0,fontFamily:"monospace"}}>⏳ syncing...</p>}
+            {!syncing && <p style={{color:"#166534",fontSize:11,margin:0,fontFamily:"monospace"}}>☁️ saved</p>}
+          </div>
         </div>
         <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:12,padding:"16px 16px 0"}}>
           {[{label:"Completed",value:completedWorkouts,color:"#4ade80"},{label:"Skipped",value:skippedWorkouts,color:"#f87171"},{label:"Streak",value:`${streak}🔥`,color:"#fb923c"}].map(s=>(
