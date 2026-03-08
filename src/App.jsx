@@ -630,7 +630,7 @@ const Icon = ({ name, size=20, color="currentColor" }) => {
 // SUB-COMPONENTS (defined outside App for stable identity = no focus loss)
 // ============================================================
 
-function HomeView({ logs, currentWeek, completedWorkouts, skippedWorkouts, setSelectedWeek, setSelectedDay, setTab, getPhaseForWeek, getDayName, logKey, Icon }) {
+function HomeView({ logs, currentWeek, completedWorkouts, skippedWorkouts, totalWorkouts, setSelectedWeek, setSelectedDay, setTab, getPhaseForWeek, getDayName, logKey, Icon }) {
   const streak = (() => {
     let s = 0;
     const keys = Object.keys(logs).sort().reverse();
@@ -1299,7 +1299,7 @@ Your role: Analyze performance data, identify trends, and provide specific, acti
 
       {/* Main content */}
       <div style={{ paddingBottom: 80 }}>
-        {tab === "home" && <HomeView logs={logs} currentWeek={currentWeek} completedWorkouts={completedWorkouts} skippedWorkouts={skippedWorkouts} setSelectedWeek={setSelectedWeek} setSelectedDay={setSelectedDay} setTab={setTab} getPhaseForWeek={getPhaseForWeek} getDayName={getDayName} logKey={logKey} Icon={Icon} />}
+        {tab === "home" && <HomeView logs={logs} currentWeek={currentWeek} completedWorkouts={completedWorkouts} skippedWorkouts={skippedWorkouts} totalWorkouts={totalWorkouts} setSelectedWeek={setSelectedWeek} setSelectedDay={setSelectedDay} setTab={setTab} getPhaseForWeek={getPhaseForWeek} getDayName={getDayName} logKey={logKey} Icon={Icon} />}
         {tab === "program" && <ProgramView logs={logs} selectedWeek={selectedWeek} selectedDay={selectedDay} setSelectedWeek={setSelectedWeek} setSelectedDay={setSelectedDay} setTab={setTab} getPhaseForWeek={getPhaseForWeek} getDayName={getDayName} logKey={logKey} getLog={getLog} setLogModal={setLogModal} setLogForm={setLogForm} saveLogs={saveLogs} Icon={Icon} currentWeek={currentWeek} />}
         {tab === "coach" && <AIView aiChats={aiChats} aiLoading={aiLoading} sendAiMessage={sendAiMessage} Icon={Icon} />}
         {tab === "stats" && <StatsView logs={logs} completedWorkouts={completedWorkouts} Icon={Icon} />}
