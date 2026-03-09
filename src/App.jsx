@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 
 // ============================================================
 // DATA
@@ -203,6 +203,29 @@ const Icon = ({ name, size=20, color="currentColor" }) => {
 };
 
 // ============================================================
+// ERROR BOUNDARY — prevents one tab crash from blacking out the app
+// ============================================================
+class ErrorBoundary extends React.Component {
+  constructor(props) { super(props); this.state = { error: null }; }
+  static getDerivedStateFromError(err) { return { error: err }; }
+  render() {
+    if (this.state.error) {
+      return (
+        <div style={{padding:40,textAlign:"center"}}>
+          <p style={{fontSize:32,marginBottom:12}}>⚠️</p>
+          <p style={{color:"#f87171",fontSize:16,fontWeight:700,marginBottom:8}}>Something went wrong</p>
+          <p style={{color:"#6b7280",fontSize:13,marginBottom:24}}>{this.state.error.message}</p>
+          <button onClick={()=>this.setState({error:null})} style={{background:"#374151",color:"#fff",border:"none",borderRadius:12,padding:"10px 20px",cursor:"pointer",fontSize:14}}>
+            Try Again
+          </button>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
+
+// ============================================================
 // MAIN APP
 // ============================================================
 export default function App() {
@@ -221,8 +244,14 @@ export default function App() {
     const init = async () => {
       // Load from localStorage instantly so UI is not blank
       try {
-        const ll = lsGet("cf_logs"); if (ll) setLogs(JSON.parse(ll));
-        const lc = lsGet("cf_chats"); if (lc) setChats(JSON.parse(lc));
+        try {
+          const ll = lsGet("cf_logs");
+          if (ll) { const p = JSON.parse(ll); if (p && typeof p === "object" && !Array.isArray(p)) setLogs(p); }
+        } catch {}
+        try {
+          const lc = lsGet("cf_chats");
+          if (lc) { const p = JSON.parse(lc); if (Array.isArray(p)) setChats(p); }
+        } catch {}
       } catch {}
 
       // Then load from cloud (authoritative source) and update
@@ -231,8 +260,14 @@ export default function App() {
           cloudLoad("logs"),
           cloudLoad("chats"),
         ]);
-        if (cloudLogs) { setLogs(cloudLogs); lsSet("cf_logs", JSON.stringify(cloudLogs)); }
-        if (cloudChats) { setChats(cloudChats); lsSet("cf_chats", JSON.stringify(cloudChats)); }
+        if (cloudLogs && typeof cloudLogs === "object" && !Array.isArray(cloudLogs)) {
+          setLogs(cloudLogs);
+          lsSet("cf_logs", JSON.stringify(cloudLogs));
+        }
+        if (cloudChats && Array.isArray(cloudChats)) {
+          setChats(cloudChats);
+          lsSet("cf_chats", JSON.stringify(cloudChats));
+        }
       } catch {}
 
       setSyncing(false);
@@ -271,9 +306,9 @@ export default function App() {
     setLogForm({ completed: true, time: "", weight: "", notes: "", rpe: 7 });
   };
 
-  const sendAiMessage = async (msg) => {
-    if (!msg || !msg.trim()) return;
-    msg = msg.trim();
+  const sendAiMessage = async (rawMsg) => {
+    const msg = (rawMsg || "").trim();
+    if (!msg) return;
     setAiLoading(true);
     const recentLogs = Object.entries(logs).slice(-10).map(([k, v]) => {
       const [, w, d] = k.match(/w(\d+)_d(\d+)/) || [];
@@ -299,7 +334,7 @@ export default function App() {
       const reply = data.content?.[0]?.text || "I couldn't process that — try again!";
       saveChats([...updated, { role: "assistant", content: reply, time: new Date().toLocaleTimeString() }]);
     } catch (err) {
-      saveChats([...updated, { role: "assistant", content: `Error: ${err.message}. Make sure ANTHROPIC_API_KEY is set in Netlify environment variables.`, time: new Date().toLocaleTimeString() }]);
+      saveChats([...updated, { role: "assistant", content: `Error: ${err.message}. Make sure ANTHROPIC_API_KEY is set in Vercel environment variables.`, time: new Date().toLocaleTimeString() }]);
     }
     setAiLoading(false);
   };
@@ -536,7 +571,7 @@ export default function App() {
           <p style={{color:"#6b7280",fontSize:12,margin:"4px 0 0"}}>Analyzes your logs & adapts your program</p>
         </div>
         <div style={{flex:1,overflowY:"auto",padding:"16px 16px 0"}}>
-          {chats.length===0 && (
+          {(!Array.isArray(chats) || chats.length===0) && (
             <div style={{paddingBottom:16}}>
               <div style={{background:"#1a0e2e",border:"1px solid #4c1d95",borderRadius:16,padding:16,marginBottom:16}}>
                 <p style={{color:"#a78bfa",fontWeight:700,margin:"0 0 8px"}}>👋 Hey, I'm your AI CrossFit Coach!</p>
@@ -546,7 +581,7 @@ export default function App() {
               {suggestions.map((s,i)=><button key={i} onClick={()=>sendAiMessage(s)} style={{display:"block",width:"100%",background:"#111",border:"1px solid #374151",borderRadius:12,padding:"12px 14px",color:"#d1d5db",fontSize:13,textAlign:"left",cursor:"pointer",marginBottom:8}}>{s}</button>)}
             </div>
           )}
-          {chats.map((msg,i)=>(
+          {(Array.isArray(chats) ? chats : []).map((msg,i)=>(
             <div key={i} style={{marginBottom:12,display:"flex",justifyContent:msg.role==="user"?"flex-end":"flex-start"}}>
               <div style={{maxWidth:"85%",background:msg.role==="user"?"#4c1d95":"#111",border:msg.role==="assistant"?"1px solid #374151":"none",borderRadius:msg.role==="user"?"18px 18px 4px 18px":"18px 18px 18px 4px",padding:"12px 14px"}}>
                 {msg.role==="assistant"&&<p style={{color:"#a78bfa",fontSize:10,fontFamily:"monospace",margin:"0 0 6px",letterSpacing:1}}>COACH</p>}
@@ -681,10 +716,10 @@ export default function App() {
     <div style={{background:"#0a0a0a",minHeight:"100vh",color:"#fff",fontFamily:"-apple-system,BlinkMacSystemFont,'SF Pro Display',sans-serif",maxWidth:430,margin:"0 auto",position:"relative"}}>
       <style>{`*{-webkit-tap-highlight-color:transparent;box-sizing:border-box}input::placeholder,textarea::placeholder{color:#4b5563}::-webkit-scrollbar{width:0}@keyframes bounce{0%,100%{transform:translateY(0)}50%{transform:translateY(-6px)}}`}</style>
       <div style={{paddingBottom:80}}>
-        {tab==="home" && <HomeView/>}
-        {tab==="program" && renderProgram()}
-        {tab==="coach" && <AIView/>}
-        {tab==="stats" && <StatsView/>}
+        {tab==="home" && <ErrorBoundary><HomeView/></ErrorBoundary>}
+        {tab==="program" && <ErrorBoundary>{renderProgram()}</ErrorBoundary>}
+        {tab==="coach" && <ErrorBoundary><AIView/></ErrorBoundary>}
+        {tab==="stats" && <ErrorBoundary><StatsView/></ErrorBoundary>}
       </div>
       <div style={{position:"fixed",bottom:0,left:"50%",transform:"translateX(-50%)",width:"100%",maxWidth:430,background:"rgba(10,10,10,.95)",backdropFilter:"blur(20px)",borderTop:"1px solid #1f2937",display:"flex",padding:"8px 0 20px",zIndex:100}}>
         {TABS.map(t=>{
