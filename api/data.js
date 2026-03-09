@@ -4,7 +4,6 @@ const CORS = {
   "Content-Type": "application/json",
 };
 
-// Upstash Redis REST API — free tier, no SDK needed, plain fetch calls
 const redis = {
   get: async (key) => {
     const url = `${process.env.UPSTASH_REDIS_REST_URL}/get/${encodeURIComponent(key)}`;
@@ -12,7 +11,6 @@ const redis = {
       headers: { Authorization: `Bearer ${process.env.UPSTASH_REDIS_REST_TOKEN}` },
     });
     const json = await res.json();
-    // Upstash returns { result: "value" } or { result: null }
     if (json.result === null || json.result === undefined) return null;
     try { return JSON.parse(json.result); } catch { return json.result; }
   },
@@ -24,7 +22,7 @@ const redis = {
         Authorization: `Bearer ${process.env.UPSTASH_REDIS_REST_TOKEN}`,
         "Content-Type": "application/json",
       },
-      body: JSON.stringify(JSON.stringify(value)), // double-stringify: Upstash stores strings
+      body: JSON.stringify(JSON.stringify(value)),
     });
   },
 };
@@ -36,9 +34,7 @@ export default async function handler(req, res) {
 
   const key = req.query.key || "default";
 
-  // Check env vars are configured
   if (!process.env.UPSTASH_REDIS_REST_URL || !process.env.UPSTASH_REDIS_REST_TOKEN) {
-    // Gracefully degrade — return null on GET, ok:true on POST (falls back to localStorage)
     if (req.method === "GET") return res.status(200).json({ data: null });
     if (req.method === "POST") return res.status(200).json({ ok: true });
   }
@@ -54,7 +50,10 @@ export default async function handler(req, res) {
 
   if (req.method === "POST") {
     try {
-      await redis.set(`cf:${key}`, req.body.data);
+      // Parse body if needed
+      let body = req.body;
+      if (typeof body === "string") body = JSON.parse(body);
+      await redis.set(`cf:${key}`, body.data);
       return res.status(200).json({ ok: true });
     } catch (err) {
       return res.status(500).json({ ok: false, error: err.message });

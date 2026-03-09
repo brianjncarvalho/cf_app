@@ -1,6 +1,14 @@
 {
   "buildCommand": "npm run build",
   "outputDirectory": "dist",
+  "functions": {
+    "api/coach.js": {
+      "memory": 256
+    },
+    "api/data.js": {
+      "memory": 256
+    }
+  },
   "rewrites": [
     { "source": "/api/coach", "destination": "/api/coach" },
     { "source": "/api/data", "destination": "/api/data" }
