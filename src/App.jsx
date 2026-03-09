@@ -329,7 +329,11 @@ export default function App() {
           messages: updated.slice(-12).map(c => ({ role: c.role, content: c.content })),
         }),
       });
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      if (!res.ok) {
+        let detail = "";
+        try { const e = await res.json(); detail = e.error || ""; } catch {}
+        throw new Error(`HTTP ${res.status}${detail ? ": " + detail : ""}`);
+      }
       const data = await res.json();
       const reply = data.content?.[0]?.text || "I couldn't process that — try again!";
       saveChats([...updated, { role: "assistant", content: reply, time: new Date().toLocaleTimeString() }]);

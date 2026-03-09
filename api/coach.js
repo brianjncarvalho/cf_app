@@ -12,23 +12,22 @@ export default async function handler(req, res) {
 
   const apiKey = process.env.ANTHROPIC_API_KEY;
   if (!apiKey) {
-    return res.status(500).json({ error: "ANTHROPIC_API_KEY not set in environment variables" });
+    return res.status(500).json({ error: "ANTHROPIC_API_KEY not set in Vercel environment variables" });
   }
 
   try {
-    // Vercel doesn't auto-parse body — handle both parsed and unparsed
+    // Vercel auto-parses JSON bodies — but guard against both parsed and raw string
     let body = req.body;
+    if (!body) return res.status(400).json({ error: "Empty request body" });
     if (typeof body === "string") {
-      body = JSON.parse(body);
-    }
-    if (!body || typeof body !== "object") {
-      return res.status(400).json({ error: "Invalid request body" });
+      try { body = JSON.parse(body); } catch {
+        return res.status(400).json({ error: "Invalid JSON body" });
+      }
     }
 
     const { messages, system } = body;
-
-    if (!messages || !Array.isArray(messages)) {
-      return res.status(400).json({ error: "messages array is required" });
+    if (!Array.isArray(messages)) {
+      return res.status(400).json({ error: `messages must be an array, got: ${typeof messages}` });
     }
 
     const response = await fetch("https://api.anthropic.com/v1/messages", {
